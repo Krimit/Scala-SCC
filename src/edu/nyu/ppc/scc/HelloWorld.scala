@@ -37,6 +37,7 @@ object HelloWorld {
     //Second implementation
     var graph: Graph = CreateGraph.erdosRenyi(5, 0.3)
     println(graph.edges)
+    val adj = graph.adjacencyMatrix
     
     println("standard scc:")
     var c = Graph.stronglyConnectedComponents(graph)
@@ -48,7 +49,7 @@ object HelloWorld {
     
     val pred = graph.predecessors(0)
     println(pred) 
-    //var conC = DCSC.concurrentSCC(nrOfWorkers = 10)
+    var conC = WDCSC.concurrentSCC(nrOfWorkers = 10, graph)
     //println(conC)
    
   }
