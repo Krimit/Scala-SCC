@@ -4,6 +4,13 @@ package edu.nyu.ppc.scc
  * Created by asher on 3/28/14.
  */
 import scala.actors._
+import org.jgrapht.DirectedGraph
+import org.jgrapht.graph.DefaultEdge
+
+class HelloWorld {
+  
+}
+
 object HelloWorld {
   def main(args: Array[String]) {
     
@@ -28,11 +35,21 @@ object HelloWorld {
     //println(results)
     
     //Second implementation
-    var graph: Graph = CreateGraph.erdosRenyi(5, 0.4)
+    var graph: Graph = CreateGraph.erdosRenyi(5, 0.3)
     println(graph.edges)
     
+    println("standard scc:")
     var c = Graph.stronglyConnectedComponents(graph)
     println(c)
+    
+    println("divide and conquer scc:")
+    val suc = graph.successors(0)
+    println(suc) 
+    
+    val pred = graph.predecessors(0)
+    println(pred) 
+    //var conC = DCSC.concurrentSCC(nrOfWorkers = 10)
+    //println(conC)
    
   }
 

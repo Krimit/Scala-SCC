@@ -93,6 +93,54 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    * @return the adjacency matrix of this graph
    */
   def adjacencyMatrix = Array.tabulate(numberOfVertices, numberOfVertices)((u, v) => this(u->v))
+  
+  
+   /**
+   * Breadth first search from source in g
+   * If we replace queue with stack, we get DFS
+   * O(V + E) - each vertex/edge is examined atmost once
+   *
+   * @param f Apply f to each vertex in bfs order from source
+   * @return If f is true at a vertex v, return Some(v) else None
+   */
+  def successors(source: Int): List[Int] = {
+    val (seen, queue) = (mutable.Set.empty[Int], mutable.Queue.empty[Int])
+
+    def visit(i: Int) = {
+      if (source != i) seen += i
+      queue += i
+    }
+
+    visit(source)
+
+    while (!queue.isEmpty) {
+      val u = queue.dequeue()
+      
+      this neighbours u filterNot seen foreach visit
+    }
+
+    seen.toList
+  }
+  
+  /**
+   * Idea: Invert edges and call successors
+   *
+   * @param f Apply f to each vertex in bfs order from source
+   * @return If f is true at a vertex v, return Some(v) else None
+   */
+  def predecessors(source: Int): List[Int] = {
+    
+    var h: Graph = new Graph(this.numberOfVertices)
+    
+    for (u <- this.vertices) {
+      for (v <- this.vertices) {
+        if ((u != v) && (this.has((u,v)))) {
+            h.update((v,u),1)   
+        }
+      }    
+    }
+    h.successors(source)
+  }
 }
 
 /**
@@ -189,6 +237,8 @@ object Graph {
     None
   }
 
+ 
+  
   /**
    * Recursive depth first search from u in g
    * TODO: Change BFS, DFS to cost too
