@@ -35,9 +35,21 @@ object HelloWorld {
     //println(results)
     
     //Second implementation
-    var graph: Graph = CreateGraph.erdosRenyi(5, 0.3)
+    val graph: Graph = CreateGraph.erdosRenyi(5, 0.6)
+    
+    /*
+    println("before:")
     println(graph.edges)
     val adj = graph.adjacencyMatrix
+    println("adj:")
+   // for (i <- adj) {
+     // println(i)
+    //}
+    //println(adj.toString())
+    
+    val s = graph.subGraph(Set(0,1,2))
+    println("after:")
+    println(s.edges)
     
     println("standard scc:")
     var c = Graph.stronglyConnectedComponents(graph)
@@ -49,8 +61,9 @@ object HelloWorld {
     
     val pred = graph.predecessors(0)
     println(pred) 
-    var conC = WDCSC.concurrentSCC(nrOfWorkers = 10, graph)
-    //println(conC)
+    */
+    val conC = WDCSC.concurrentSCC(nrOfWorkers = 10, graph)
+    println(conC)
    
   }
 

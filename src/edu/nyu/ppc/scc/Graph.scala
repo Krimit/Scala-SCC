@@ -94,6 +94,34 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    */
   def adjacencyMatrix = Array.tabulate(numberOfVertices, numberOfVertices)((u, v) => this(u->v))
   
+  def isEmpty = edges.isEmpty
+  
+  def subGraph(onlyTheseVertexes: Set[Int]): Graph = {
+    //val cpy = adjacencyList.clone()
+    //Array.fill(numberOfVertices)(mutable.Map.empty[Int, Double] withDefaultValue Double.PositiveInfinity)
+    //NOTE: this makes a new graph. Maybe better - return a view? How to do this?
+    val h = new Graph(onlyTheseVertexes.size)
+    println(onlyTheseVertexes.size + " vertices: ")
+    println(h.vertices)
+    for (v <- onlyTheseVertexes) {
+      println(adjacencyList(v).keySet)
+      for (u <- adjacencyList(v).keySet) {
+        println(v + " " + u)
+        if (v != u && onlyTheseVertexes.contains(u)) {
+          h.update((v,u),1) 
+        }
+        
+        //h.apply(v,u)
+      }
+    }
+    h
+  }
+  
+  def subGraph(onlyTheseVertexes: List[Int]): Graph = {
+    subGraph(onlyTheseVertexes.toSet)
+  }
+  
+  def remove(num: Int) = adjacencyList diff List(num)
   
    /**
    * Breadth first search from source in g
