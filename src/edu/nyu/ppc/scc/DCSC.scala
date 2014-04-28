@@ -3,79 +3,124 @@ package edu.nyu.ppc.scc
 import akka.actor._
 import akka.routing.RoundRobinRouter
 import scala.concurrent.duration._
+import scala.collection.immutable.Queue
+import akka.event.LoggingAdapter
+import scala.collection.mutable
+
 
  
 object DCSC {
- 
+  
+  
+  
   sealed trait SCCMessage
   case object Calculate extends SCCMessage
-  case class Work(start: Int, nrOfElements: Int) extends SCCMessage
-  case class Result(value: Double) extends SCCMessage
-  case class PiApproximation(pi: Double, duration: Duration)
+  case class Calculate(g: Graph) extends SCCMessage
+  case class Work(graph: Graph, v: Int) extends SCCMessage
+  case class Instruct(graph: Graph, listener: ActorRef) extends SCCMessage
+  case class Result(component: Set[Int]) extends SCCMessage
+  case class Descendant(list: List[Int])
+  case class Predecessor(list: List[Int])
+  case class Stop
+  case class Done
+  case class ReportResult
  
-  class Worker extends Actor {
- 
-    def calculatePiFor(start: Int, nrOfElements: Int): Double = {
-      var acc = 0.0
-      for (i ← start until (start + nrOfElements))
-        acc += 4.0 * (1 - (i % 2) * 2) / (2 * i + 1)
-      acc
-    }
- 
-    def receive = {
-      case Work(start, nrOfElements) ⇒
-        sender ! Result(calculatePiFor(start, nrOfElements)) // perform the work
-    }
-  }
- 
-  class Master(nrOfWorkers: Int, nrOfMessages: Int, nrOfElements: Int, listener: ActorRef)
-    extends Actor {
- 
-    var pi: Double = _
-    var nrOfResults: Int = _
-    val start: Long = System.currentTimeMillis
- 
-    val workerRouter = context.actorOf(
-      Props[Worker].withRouter(RoundRobinRouter(nrOfWorkers)), name = "workerRouter")
- 
-    def receive = {
-      case Calculate ⇒
-        for (i ← 0 until nrOfMessages) workerRouter ! Work(i * nrOfElements, nrOfElements)
-      case Result(value) ⇒
-        pi += value
-        nrOfResults += 1
-        if (nrOfResults == nrOfMessages) {
-          // Send the result to the listener
-          listener ! PiApproximation(pi, duration = (System.currentTimeMillis - start).millis)
-          // Stops this actor and all its supervised children
-          context.stop(self)
+  class Worker() extends Actor {
+    var numResponses = 0
+    //val worker: ActorRef = context.actorOf(Props[Worker], "worker1")
+    
+    def receive() = {
+      case Instruct(graph, listen) =>
+        if (graph.edges.isEmpty) { // output each vertex as component
+          for (c <- graph.vertices) yield listen ! Result(Set(c))
+          context.parent ! Done
+        } else { //do work
+          
+          val v = graph.vertices.head
+          
+          val pred = graph.predecessors(v)
+          val desc = graph.successors(v)
+          
+          val scc = (pred.intersect(desc))
+          
+          listen ! Result(scc)
+          
+          val name1 = "work1"// + self.path
+          val name2 = "work2"// + self.path
+          val name3 = "work3"// + self.path
+          val worker1 = context.actorOf(Props[Worker])
+          val worker2 = context.actorOf(Props[Worker])
+          val worker3 = context.actorOf(Props[Worker])
+
+          worker1 ! Instruct(graph.subGraphOf(pred--scc), listen)
+   
+          worker2 ! Instruct(graph.subGraphOf(desc--scc), listen)
+          
+          worker3 ! Instruct(graph.subGraphWithout(pred.union(desc)), listen)
         }
+      
+      case Done =>
+        sender ! PoisonPill
+        numResponses += 1
+        if (numResponses == 3) {
+          context.parent ! Done
+        }
+     
     }
- 
   }
+  
  
-  class Listener extends Actor {
+ 
+  class Master(graph: Graph, listener: ActorRef) extends Actor {
+    
+    //val collector = context.actorOf(Props[Listener], "listener")  
+     // def createRoot: ActorRef = context.actorOf(BinaryTreeNode.props(0, initiallyRemoved = true))
+    
+    val worker: ActorRef = context.actorOf(Props[Worker], "worker1")
+    
     def receive = {
-      case PiApproximation(pi, duration) ⇒
-        println("\n\tPi approximation: \t\t%s\n\tCalculation time: \t%s"
-          .format(pi, duration))
-        context.system.shutdown()
+      case Calculate =>
+        worker ! Instruct(graph, listener) //start calculating
+      case Done =>
+        sender ! PoisonPill
+        listener ! ReportResult
+        println("all done now")
+     
     }
   }
  
+  class Listener(val resultingComponents: mutable.Queue[Set[Int]]) extends Actor with ActorLogging {
+   // LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+    
+    def receive = {
+      case Result(component) =>
+        resultingComponents.enqueue(component)
+        //println(resultingComponents)
+        log.debug("Added a component {}", component.toString)
+        
+      case ReportResult =>
+        println(resultingComponents)
+        //sender ! PoisonPill
+        //context.stop(self)
+        
+    }
+  }
  
-  def concurrentSCC(nrOfWorkers: Int) {
-    val nrOfElements: Int = 1000 
-    val nrOfMessages: Int = 1000
+  def props(queue: mutable.Queue[Set[Int]]) = Props(classOf[Listener], queue)
+ 
+  def concurrentSCC(graph: Graph) {
+   
     // Create an Akka system
-    val system = ActorSystem("PiSystem")
+    val system = ActorSystem("SCCSystem")
  
-    // create the result listener, which will print the result and shutdown the system
-    val listener = system.actorOf(Props[Listener], name = "listener")
+    // create the result listener, which will collect the results
+    val components = mutable.Queue.empty[Set[Int]]
+    val listener = system.actorOf(props(components), name = "listener")
+    
  
     // create the master
     val master = system.actorOf(Props(new Master(
-      nrOfWorkers, nrOfMessages, nrOfElements, listener)),
+      graph, listener)),
       name = "master")
  
     // start the calculation

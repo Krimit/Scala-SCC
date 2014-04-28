@@ -15,7 +15,7 @@ object CreateGraph {
     for (u <- graph.vertices) {
       for (v <- graph.vertices) {
         if ((u != v) && (rand.nextDouble() <= p)) {
-            graph.update((u,v),1)   
+            graph.update((u -> v))   
         }
       }    
     }

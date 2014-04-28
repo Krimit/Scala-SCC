@@ -1,6 +1,7 @@
 package edu.nyu.ppc.scc
 
 import collection.mutable
+import scala.util.Random
 
 /**
  * A semi mutable weighted graph representation using adjacency list
@@ -12,11 +13,39 @@ import collection.mutable
 class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
   import Graph.EndPoints
 
-  private val adjacencyList = Array.fill(numberOfVertices)(mutable.Map.empty[Int, Double] withDefaultValue Double.PositiveInfinity)
+  //private val adjacencyList = Array.fill(numberOfVertices)(mutable.Map.empty[Int, Double] withDefaultValue Double.PositiveInfinity)
+    private var adjacencyList:mutable.Map[Int, List[Int]] = build(numberOfVertices)
+    private var reverseAdjacencyList:mutable.Map[Int, List[Int]] = build(numberOfVertices)
 
+  //private val adjacencyList = (0 to numberOfVertices) map { i => (i, Map[Int, Double]) } toMap(mutable.Map.empty[Int, Double] withDefaultValue Double.PositiveInfinity)
+  //private var adjacencyList:Map[Int, Map[Int, Double]] = (0 to numberOfVertices) map { i => (i, Map[Int, Double]()) } toMap
+  
+  
   private implicit class Edge(points: EndPoints) {
     val (u, v) = points
     assume(hasVertices(u, v))
+  }
+    
+  def build(n: Integer) = {
+    val m:mutable.Map[Int,List[Int]] = mutable.Map()
+    var i = 0
+    for (i <- 1 to n) {
+      m += (i->List[Int]())
+    }
+    m
+  }
+  
+  def buildFromSet(vs: Set[Int]):mutable.Map[Int, List[Int]] = {
+    val m:mutable.Map[Int,List[Int]] = mutable.Map()
+    for (i <- vs) {
+      m += (i->List[Int]())
+    }
+    m
+  }
+  
+  
+  def withThisAdjList(adj :mutable.Map[Int, List[Int]]) = {
+    adjacencyList = adj
   }
 
   /**
@@ -26,7 +55,7 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    * @param points (from,to)
    * @return edge value (else 0 if from==to or +infinity if from and to has no edge)
    */
-  def apply(points: EndPoints): Double = if (points.u == points.v) 0.0 else adjacencyList(points.u)(points.v)
+  def apply(points: EndPoints): Boolean = if (points.u == points.v) true else adjacencyList(points.u).contains(points.v)
 
   /**
    * curried alternative to @see apply(EndPoints)
@@ -35,8 +64,8 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    * @param v to
    * @return edge value of u->v
    */
-  def apply(u: Int)(v: Int): Double = this(u->v)
-
+  def apply(u: Int)(v: Int): Boolean = this(u->v)
+  
   /**
    * Check if edge exists
    * @param points (from,to)
@@ -52,8 +81,8 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
   /**
    * @return neighbors of u
    */
-  def neighbours(u: Int) = adjacencyList(u).keySet
-
+  def neighbours(u: Int) = adjacencyList(u)
+  
   /**
    * Update edges
    * To remove use -=
@@ -61,10 +90,19 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    * @param points (from, to)
    * @param weight (from,to) = weight
    */
-  def update(points: EndPoints, weight: Double) {
-    adjacencyList(points.u)(points.v) = weight
+  def update(points: EndPoints) {
+    if(!adjacencyList.contains(points.u)) {
+       adjacencyList += (points.u->List[Int]())
+    }
+    if(!adjacencyList.contains(points.v)) {
+       adjacencyList += (points.v->List[Int]())
+    }
+    if (!adjacencyList(points.u).contains((points.v))) {
+      adjacencyList(points.u) = (points.v)::adjacencyList(points.u)
+    }
+    
     if (!isDirected) {
-      adjacencyList(points.v)(points.u) = weight
+      adjacencyList(points.v) = (points.u)::adjacencyList(points.v)
     }
   }
 
@@ -73,55 +111,63 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    * @param points (from,to)
    */
   def -=(points: EndPoints) {
-    adjacencyList(points.u) -= points.v
+    adjacencyList(points.u) = adjacencyList(points.u) diff List(points.v)
     if (!isDirected) {
-      adjacencyList(points.v) -= (points.u)
+      adjacencyList(points.v) = adjacencyList(points.v) diff List(points.u)
     }
   }
 
   /**
    * @return vertices in graph
    */
-  def vertices = adjacencyList.indices
+  def vertices = adjacencyList.keySet
 
   /**
    * @return edges in graph
    */
-  def edges = for (u <- vertices; v <- neighbours(u)) yield u->v
+  def edges = for (u <- vertices; v <- neighbours(u)) yield u->v //TODO: TEST!
 
+  /*
   /**
    * @return the adjacency matrix of this graph
    */
   def adjacencyMatrix = Array.tabulate(numberOfVertices, numberOfVertices)((u, v) => this(u->v))
-  
+  */
   def isEmpty = edges.isEmpty
   
-  def subGraph(onlyTheseVertexes: Set[Int]): Graph = {
-    //val cpy = adjacencyList.clone()
-    //Array.fill(numberOfVertices)(mutable.Map.empty[Int, Double] withDefaultValue Double.PositiveInfinity)
+  def subGraphOf(group: List[Int]) = {
     //NOTE: this makes a new graph. Maybe better - return a view? How to do this?
-    val h = new Graph(onlyTheseVertexes.size)
-    println(onlyTheseVertexes.size + " vertices: ")
-    println(h.vertices)
-    for (v <- onlyTheseVertexes) {
-      println(adjacencyList(v).keySet)
-      for (u <- adjacencyList(v).keySet) {
-        println(v + " " + u)
-        if (v != u && onlyTheseVertexes.contains(u)) {
-          h.update((v,u),1) 
-        }
-        
-        //h.apply(v,u)
-      }
-    }
+    val h = new Graph(0)
+    val newAdj = adjacencyList.filterKeys( group.contains ).mapValues( x => x intersect ( group ) )
+    h.withThisAdjList(mutable.Map(newAdj.toSeq: _*))
     h
   }
   
-  def subGraph(onlyTheseVertexes: List[Int]): Graph = {
-    subGraph(onlyTheseVertexes.toSet)
+  def subGraphWithout(group: List[Int]) = {
+    //NOTE: this makes a new graph. Maybe better - return a view? How to do this?
+    val h = new Graph(0)
+    val newAdj = adjacencyList.filterKeys(x => !group.contains(x) ).mapValues( x => x.diff(group) )
+    h.withThisAdjList(mutable.Map(newAdj.toSeq: _*))
+    h
   }
   
-  def remove(num: Int) = adjacencyList diff List(num)
+  def subGraphWithout(onlyTheseVertexes: Set[Int]): Graph = {
+    subGraphWithout(onlyTheseVertexes.toList)
+  }
+  
+  def subGraphOf(onlyTheseVertexes: Set[Int]): Graph = {
+    subGraphOf(onlyTheseVertexes.toList)
+  }
+  
+  def remove(num: Int) = adjacencyList -= num
+  
+  override def toString() = {
+    adjacencyList.toString()
+  }
+  
+  def getRandomVertex() = {
+    vertices(Random.nextInt(vertices.size))
+  }
   
    /**
    * Breadth first search from source in g
@@ -131,11 +177,11 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    * @param f Apply f to each vertex in bfs order from source
    * @return If f is true at a vertex v, return Some(v) else None
    */
-  def successors(source: Int): List[Int] = {
-    val (seen, queue) = (mutable.Set.empty[Int], mutable.Queue.empty[Int])
+  def successors(source: Int): Set[Int] = {
+    var (seen, queue) = (Set[Int](source), mutable.Queue.empty[Int])
 
     def visit(i: Int) = {
-      if (source != i) seen += i
+      if (source != i) seen = seen + i
       queue += i
     }
 
@@ -147,7 +193,7 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
       this neighbours u filterNot seen foreach visit
     }
 
-    seen.toList
+    seen
   }
   
   /**
@@ -156,14 +202,20 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    * @param f Apply f to each vertex in bfs order from source
    * @return If f is true at a vertex v, return Some(v) else None
    */
-  def predecessors(source: Int): List[Int] = {
+  def predecessors(source: Int): Set[Int] = {
     
-    var h: Graph = new Graph(this.numberOfVertices)
+    var h: Graph = new Graph(0)
+    val m:mutable.Map[Int,List[Int]] = mutable.Map()
+    for (i <- this.vertices) {
+      m += (i->List[Int]())
+    }
+    h.withThisAdjList(m)
+
     
     for (u <- this.vertices) {
       for (v <- this.vertices) {
         if ((u != v) && (this.has((u,v)))) {
-            h.update((v,u),1)   
+            h.update((v,u))   
         }
       }    
     }

@@ -14,7 +14,20 @@ class HelloWorld {
 object HelloWorld {
   def main(args: Array[String]) {
     
+    /*
     println("Hello, dude! you rule the world!")
+    val m = Map("normal" -> Map("home" -> Map("wins" -> 0, "scores" -> 0),
+                                   "away" -> Map("wins" -> 0, "scores" -> 0)))
+                                   println(m)
+    val map:Map[String,Map[String,Int]] = 
+      Map(
+        "mykey" -> Map("myval" -> 3),
+        "myotherkey" -> Map("otherval" -> 4)
+        )
+
+        val k = map + ("nextkey" -> Map("nextval" -> 5))
+    println(k)
+    */
     /*
     var capital = Map("US" -> "Washington DC", "France" -> "Paris")
     capital += ("Japan" -> "Tokyo")
@@ -35,53 +48,39 @@ object HelloWorld {
     //println(results)
     
     //Second implementation
-    val graph: Graph = CreateGraph.erdosRenyi(5, 0.6)
-    
+    var graph: Graph = CreateGraph.erdosRenyi(50, 0.01)
+    println(graph)
     /*
+    println("vertices: " + graph.vertices)
     println("before:")
-    println(graph.edges)
-    val adj = graph.adjacencyMatrix
-    println("adj:")
+    println(graph)
+    //println("adj:")
    // for (i <- adj) {
      // println(i)
     //}
     //println(adj.toString())
     
-    val s = graph.subGraph(Set(0,1,2))
-    println("after:")
-    println(s.edges)
+    val s = graph.subGraphOf(Set(1,2,4))
+    println("after of:")
+    println(s)
     
+    val ss = graph.subGraphWithout(Set(1,2,4))
+    println("after without:")
+    println(ss)
+    */
     println("standard scc:")
     var c = Graph.stronglyConnectedComponents(graph)
     println(c)
     
     println("divide and conquer scc:")
-    val suc = graph.successors(0)
-    println(suc) 
+    //val suc = graph.successors(1)
+    //println(suc) 
     
-    val pred = graph.predecessors(0)
-    println(pred) 
-    */
-    val conC = WDCSC.concurrentSCC(nrOfWorkers = 10, graph)
+    //val pred = graph.predecessors(2)
+   // println(pred) 
+    var conC = DCSC.concurrentSCC(graph)
     println(conC)
    
   }
-
-  object SillyActor extends Actor {
-    def act(){
-      for (i <- 1 to 5) {
-        println("I'm acting doood! " + i.toString())
-        Thread.sleep(1000)
-      }
-    }
-  }
-
-  def factorial(x: BigInt): BigInt =
-    if (x == 0) 1 else x * factorial(x-1)
-
-
-  def square(x: Double) = x * x
-
-  def sumOfSquares(x: Double, y: Double) = square(x) + square(y)
 
 }

@@ -7,7 +7,7 @@ import scala.collection.immutable.Queue
 
  
 object WDCSC {
- 
+ /*
   sealed trait SCCMessage
   case object Calculate extends SCCMessage
   case class Calculate(g: Graph) extends SCCMessage
@@ -137,4 +137,5 @@ object WDCSC {
  
   }
 
+*/
 }
