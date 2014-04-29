@@ -6,6 +6,10 @@ package edu.nyu.ppc.scc
 import scala.actors._
 import org.jgrapht.DirectedGraph
 import org.jgrapht.graph.DefaultEdge
+import java.util.ArrayList
+import org.jgrapht.UndirectedGraph
+import org.jgrapht._;
+import org.jgrapht.graph._;
 
 class HelloWorld {
   
@@ -52,8 +56,8 @@ object HelloWorld {
     //println(results)
     
     //Second implementation
-    var graph: Graph = CreateGraph.erdosRenyi(100, 0.01)
-    println(graph)
+    var graph: Graph = CreateGraph.erdosRenyi(1000, 0.1)
+    //println(graph)
     /*
     println("vertices: " + graph.vertices)
     println("before:")
@@ -72,9 +76,12 @@ object HelloWorld {
     println("after without:")
     println(ss)
     */
+    
+    // val g: UndirectedGraph[Integer, DefaultEdge] =
+      //      new SimpleGraph[Integer, DefaultEdge]();
     println("standard scc:")
-    val c = Graph.stronglyConnectedComponents(graph)
-    println(c)
+    val c = time(Graph.stronglyConnectedComponents(graph))
+    //println(c)
     
     println("divide and conquer scc:")
     //val suc = graph.successors(1)
@@ -82,12 +89,26 @@ object HelloWorld {
     
     //val pred = graph.predecessors(2)
    // println(pred) 
-    val b = DCSC.concurrentSCC(graph)
+    val b = time(DCSC.concurrentSCC(graph))
     println("ARE WE EQUAL? " + b.toSet.equals(c.toSet))
     
     
-    println("final in main: " + b)
+    //println("final in main: " + b)
+    println("total time building graphs: " + graph.getTimeCounter)
+    
+    //statistics:
+    println((timeList.get(1)).toDouble/timeList.get(0))
+    println((timeList.get(1)-graph.getTimeCounter).toDouble/timeList.get(0))
    
+  }
+  var timeList: ArrayList[Long] = new ArrayList[Long]()
+  def time[R](block: => R): R = {
+    val t0 = System.nanoTime()
+    val result = block    // call-by-name
+    val t1 = System.nanoTime()
+    println("Elapsed time: " + (t1 - t0) + "ns")
+    timeList.add(t1 - t0)
+    result
   }
 
 }

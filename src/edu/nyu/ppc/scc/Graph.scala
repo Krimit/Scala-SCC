@@ -170,6 +170,24 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
     vertices.slice(i, i+1).head
   }
   
+  var totalTime: Integer = 0
+  def time[R](block: => R): R = {
+    val t0 = System.nanoTime()
+    val result = block    // call-by-name
+    val t1 = System.nanoTime()
+    totalTime += (t1 - t0).intValue()
+    result
+  }
+  
+  def getTimeCounter(): Int = {
+    totalTime
+  }
+  
+  def resetTimeCounter() = {
+    totalTime = 0
+  }
+  
+  
    /**
    * Breadth first search from source in g
    * If we replace queue with stack, we get DFS

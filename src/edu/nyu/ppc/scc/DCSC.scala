@@ -66,9 +66,9 @@ object DCSC {
               context.watch(worker2)
               context.watch(worker3)
 
-              worker1 ! Instruct(graph.subGraphOf(pred--scc), listen)  
-              worker2 ! Instruct(graph.subGraphOf(desc--scc), listen)          
-              worker3 ! Instruct(graph.subGraphWithout(pred.union(desc)), listen)
+              worker1 ! Instruct(graph.time(graph.subGraphOf(pred--scc)), listen)  
+              worker2 ! Instruct(graph.time(graph.subGraphOf(desc--scc)), listen)          
+              worker3 ! Instruct(graph.time(graph.subGraphWithout(pred.union(desc))), listen)
               
           }      
         }
@@ -125,7 +125,8 @@ object DCSC {
   def props(queue: mutable.Queue[Set[Int]], p: Promise[mutable.Queue[Set[Int]]]) = Props(classOf[Listener], queue, p)
  
   def concurrentSCC(graph: Graph): mutable.Queue[Set[Int]] =  {
-   
+    
+    graph.resetTimeCounter
     // Create an Akka system
     val system = ActorSystem("SCCSystem")
  
@@ -149,8 +150,8 @@ object DCSC {
       case output =>
         system.shutdown
         println("got promise!")
-        println(output)
-        output
+        //println(output)
+        //output
     }
     
     val output = Await.result(p.future, Duration.Inf)
