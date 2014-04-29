@@ -14,6 +14,10 @@ class HelloWorld {
 object HelloWorld {
   def main(args: Array[String]) {
     
+    val s1 = Set[Int](1,2,3)
+    val s2 = Set[Int](1,2,3)
+    val s3 = s1
+    println("equal sets: " + s1.equals(s2) + " " + s1.equals(s3))
     /*
     println("Hello, dude! you rule the world!")
     val m = Map("normal" -> Map("home" -> Map("wins" -> 0, "scores" -> 0),
@@ -48,7 +52,7 @@ object HelloWorld {
     //println(results)
     
     //Second implementation
-    var graph: Graph = CreateGraph.erdosRenyi(50, 0.01)
+    var graph: Graph = CreateGraph.erdosRenyi(100, 0.01)
     println(graph)
     /*
     println("vertices: " + graph.vertices)
@@ -69,7 +73,7 @@ object HelloWorld {
     println(ss)
     */
     println("standard scc:")
-    var c = Graph.stronglyConnectedComponents(graph)
+    val c = Graph.stronglyConnectedComponents(graph)
     println(c)
     
     println("divide and conquer scc:")
@@ -78,8 +82,11 @@ object HelloWorld {
     
     //val pred = graph.predecessors(2)
    // println(pred) 
-    var conC = DCSC.concurrentSCC(graph)
-    println(conC)
+    val b = DCSC.concurrentSCC(graph)
+    println("ARE WE EQUAL? " + b.toSet.equals(c.toSet))
+    
+    
+    println("final in main: " + b)
    
   }
 

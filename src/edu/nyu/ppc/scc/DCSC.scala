@@ -6,6 +6,11 @@ import scala.concurrent.duration._
 import scala.collection.immutable.Queue
 import akka.event.LoggingAdapter
 import scala.collection.mutable
+import java.util.concurrent.CountDownLatch
+import scala.concurrent.Promise
+import scala.concurrent.duration.Duration
+import scala.concurrent._
+import ExecutionContext.Implicits.global
 
 
  
@@ -24,48 +29,56 @@ object DCSC {
   case class Stop
   case class Done
   case class ReportResult
+  case class FinalResult(components: mutable.Queue[Set[Int]])
  
   class Worker() extends Actor {
-    var numResponses = 0
-    //val worker: ActorRef = context.actorOf(Props[Worker], "worker1")
     
-    def receive() = {
+    def receive = start(0)
+    
+    def start(count : Int): Receive = {
       case Instruct(graph, listen) =>
         if (graph.edges.isEmpty) { // output each vertex as component
           for (c <- graph.vertices) yield listen ! Result(Set(c))
-          context.parent ! Done
+          context.stop(self)
         } else { //do work
           
-          val v = graph.vertices.head
+          val v = graph.getRandomVertex()
           
-          val pred = graph.predecessors(v)
-          val desc = graph.successors(v)
+          val pred = Future(graph.predecessors(v))
+          val desc = Future(graph.successors(v))
           
-          val scc = (pred.intersect(desc))
+          val future = for {
+            x <- pred
+            y <- desc
+          } yield (x, y)
           
-          listen ! Result(scc)
+          future onSuccess {
+            case (pred, desc) =>
+              val scc = (pred.intersect(desc))
           
-          val name1 = "work1"// + self.path
-          val name2 = "work2"// + self.path
-          val name3 = "work3"// + self.path
-          val worker1 = context.actorOf(Props[Worker])
-          val worker2 = context.actorOf(Props[Worker])
-          val worker3 = context.actorOf(Props[Worker])
+              listen ! Result(scc)
+          
+             
+              val worker1 = context.actorOf(Props[Worker])
+              val worker2 = context.actorOf(Props[Worker])
+              val worker3 = context.actorOf(Props[Worker])
+              context.watch(worker1)
+              context.watch(worker2)
+              context.watch(worker3)
 
-          worker1 ! Instruct(graph.subGraphOf(pred--scc), listen)
-   
-          worker2 ! Instruct(graph.subGraphOf(desc--scc), listen)
-          
-          worker3 ! Instruct(graph.subGraphWithout(pred.union(desc)), listen)
+              worker1 ! Instruct(graph.subGraphOf(pred--scc), listen)  
+              worker2 ! Instruct(graph.subGraphOf(desc--scc), listen)          
+              worker3 ! Instruct(graph.subGraphWithout(pred.union(desc)), listen)
+              
+          }      
         }
       
-      case Done =>
-        sender ! PoisonPill
-        numResponses += 1
-        if (numResponses == 3) {
-          context.parent ! Done
+      case Terminated(child) =>  
+        if (count == 2) {
+          context.stop(self)
+        } else {
+          context.become(start(count+1))
         }
-     
     }
   }
   
@@ -77,19 +90,20 @@ object DCSC {
      // def createRoot: ActorRef = context.actorOf(BinaryTreeNode.props(0, initiallyRemoved = true))
     
     val worker: ActorRef = context.actorOf(Props[Worker], "worker1")
+    context.watch(worker)
     
     def receive = {
       case Calculate =>
         worker ! Instruct(graph, listener) //start calculating
-      case Done =>
-        sender ! PoisonPill
+      case Terminated(worker) =>
         listener ! ReportResult
-        println("all done now")
+        context.stop(self)
+        
      
     }
   }
  
-  class Listener(val resultingComponents: mutable.Queue[Set[Int]]) extends Actor with ActorLogging {
+  class Listener(val resultingComponents: mutable.Queue[Set[Int]], p: Promise[mutable.Queue[Set[Int]]]) extends Actor with ActorLogging {
    // LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     
     def receive = {
@@ -99,24 +113,27 @@ object DCSC {
         log.debug("Added a component {}", component.toString)
         
       case ReportResult =>
-        println(resultingComponents)
+        //println(resultingComponents)
+        sender ! FinalResult(resultingComponents)
+        p.success(resultingComponents)
         //sender ! PoisonPill
-        //context.stop(self)
+        context.stop(self)
         
     }
   }
  
-  def props(queue: mutable.Queue[Set[Int]]) = Props(classOf[Listener], queue)
+  def props(queue: mutable.Queue[Set[Int]], p: Promise[mutable.Queue[Set[Int]]]) = Props(classOf[Listener], queue, p)
  
-  def concurrentSCC(graph: Graph) {
+  def concurrentSCC(graph: Graph): mutable.Queue[Set[Int]] =  {
    
     // Create an Akka system
     val system = ActorSystem("SCCSystem")
  
     // create the result listener, which will collect the results
+    val p = Promise[mutable.Queue[Set[Int]]]
     val components = mutable.Queue.empty[Set[Int]]
-    val listener = system.actorOf(props(components), name = "listener")
-    
+    val listener = system.actorOf(props(components, p), name = "listener")
+ 
  
     // create the master
     val master = system.actorOf(Props(new Master(
@@ -125,6 +142,20 @@ object DCSC {
  
     // start the calculation
     master ! Calculate
- 
+    
+    
+    
+    p.future onSuccess {
+      case output =>
+        system.shutdown
+        println("got promise!")
+        println(output)
+        output
+    }
+    
+    val output = Await.result(p.future, Duration.Inf)
+    
+    //println("all done now outside as well")
+    output
   }
 }

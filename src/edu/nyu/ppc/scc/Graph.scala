@@ -165,8 +165,9 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
     adjacencyList.toString()
   }
   
-  def getRandomVertex() = {
-    vertices(Random.nextInt(vertices.size))
+  def getRandomVertex(): Int = {
+    val i = Random.nextInt(vertices.size)
+    vertices.slice(i, i+1).head
   }
   
    /**
