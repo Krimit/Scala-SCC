@@ -19,15 +19,9 @@ object DCSC {
   
   
   sealed trait SCCMessage
-  case object Calculate extends SCCMessage
   case class Calculate(g: Graph) extends SCCMessage
-  case class Work(graph: Graph, v: Int) extends SCCMessage
   case class Instruct(graph: Graph, listener: ActorRef) extends SCCMessage
   case class Result(component: Set[Int]) extends SCCMessage
-  case class Descendant(list: List[Int])
-  case class Predecessor(list: List[Int])
-  case class Stop
-  case class Done
   case class ReportResult
   case class FinalResult(components: mutable.Queue[Set[Int]])
  
@@ -37,13 +31,13 @@ object DCSC {
     
     def start(count : Int): Receive = {
       case Instruct(graph, listen) =>
-        if (graph.edges.isEmpty) { // output each vertex as component
+        if (graph.vertices.isEmpty) {
+          context.stop(self)
+        } else if (graph.edges.isEmpty) { // output each vertex as component
           for (c <- graph.vertices) yield listen ! Result(Set(c))
           context.stop(self)
-        } else { //do work
-          
-          val v = graph.getRandomVertex()
-          
+        } else { //do work        
+          val v = graph.getRandomVertex()         
           val pred = Future(graph.predecessors(v))
           val desc = Future(graph.successors(v))
           
@@ -57,19 +51,19 @@ object DCSC {
               val scc = (pred.intersect(desc))
           
               listen ! Result(scc)
-          
-             
+              
               val worker1 = context.actorOf(Props[Worker])
               val worker2 = context.actorOf(Props[Worker])
               val worker3 = context.actorOf(Props[Worker])
-              context.watch(worker1)
-              context.watch(worker2)
-              context.watch(worker3)
+              //context.watch(worker1)
+              //context.watch(worker2)
+              //context.watch(worker3)
 
               worker1 ! Instruct(graph.time(graph.subGraphOf(pred--scc)), listen)  
               worker2 ! Instruct(graph.time(graph.subGraphOf(desc--scc)), listen)          
               worker3 ! Instruct(graph.time(graph.subGraphWithout(pred.union(desc))), listen)
               
+              context.stop(self)
           }      
         }
       
@@ -81,13 +75,8 @@ object DCSC {
         }
     }
   }
-  
- 
- 
+
   class Master(graph: Graph, listener: ActorRef) extends Actor {
-    
-    //val collector = context.actorOf(Props[Listener], "listener")  
-     // def createRoot: ActorRef = context.actorOf(BinaryTreeNode.props(0, initiallyRemoved = true))
     
     val worker: ActorRef = context.actorOf(Props[Worker], "worker1")
     context.watch(worker)
@@ -109,16 +98,12 @@ object DCSC {
     def receive = {
       case Result(component) =>
         resultingComponents.enqueue(component)
-        //println(resultingComponents)
         log.debug("Added a component {}", component.toString)
         
       case ReportResult =>
-        //println(resultingComponents)
         sender ! FinalResult(resultingComponents)
         p.success(resultingComponents)
-        //sender ! PoisonPill
-        context.stop(self)
-        
+        context.stop(self)      
     }
   }
  

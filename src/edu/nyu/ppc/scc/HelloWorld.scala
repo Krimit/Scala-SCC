@@ -56,7 +56,7 @@ object HelloWorld {
     //println(results)
     
     //Second implementation
-    var graph: Graph = CreateGraph.erdosRenyi(1000, 0.1)
+    var graph: Graph = CreateGraph.erdosRenyi(100, 0.3)
     //println(graph)
     /*
     println("vertices: " + graph.vertices)
@@ -89,6 +89,7 @@ object HelloWorld {
     
     //val pred = graph.predecessors(2)
    // println(pred) 
+    println("DCSC")
     val b = time(DCSC.concurrentSCC(graph))
     println("ARE WE EQUAL? " + b.toSet.equals(c.toSet))
     
@@ -97,8 +98,17 @@ object HelloWorld {
     println("total time building graphs: " + graph.getTimeCounter)
     
     //statistics:
-    println((timeList.get(1)).toDouble/timeList.get(0))
+    println("DCSC to standard: " + (timeList.get(1)).toDouble/timeList.get(0))
     println((timeList.get(1)-graph.getTimeCounter).toDouble/timeList.get(0))
+    
+    println("WDCSC")
+    graph.resetTimeCounter()
+    val bb = time(WDCSC.concurrentSCC(graph))
+    println("ARE WE EQUAL? " + bb.toSet.equals(b.toSet))
+    //println("final in main: " + b)
+    println("total time building graphs: " + graph.getTimeCounter)
+    println("WDCSC to standard: " + (timeList.get(2)).toDouble/timeList.get(0))
+    println("WDCSC to DCSC: " + (timeList.get(2)).toDouble/timeList.get(1))
    
   }
   var timeList: ArrayList[Long] = new ArrayList[Long]()
