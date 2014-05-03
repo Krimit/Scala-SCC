@@ -11,12 +11,13 @@ import scala.concurrent.Promise
 import scala.concurrent.duration.Duration
 import scala.concurrent._
 import ExecutionContext.Implicits.global
+import com.typesafe.config.ConfigFactory
 
 
  
 object DCSC {
   
-  
+  val config = ConfigFactory.load()
   
   sealed trait SCCMessage
   case class Calculate(g: Graph) extends SCCMessage
@@ -55,15 +56,15 @@ object DCSC {
               val worker1 = context.actorOf(Props[Worker])
               val worker2 = context.actorOf(Props[Worker])
               val worker3 = context.actorOf(Props[Worker])
-              //context.watch(worker1)
-              //context.watch(worker2)
-              //context.watch(worker3)
+              context.watch(worker1)
+              context.watch(worker2)
+              context.watch(worker3)
 
               worker1 ! Instruct(graph.time(graph.subGraphOf(pred--scc)), listen)  
               worker2 ! Instruct(graph.time(graph.subGraphOf(desc--scc)), listen)          
               worker3 ! Instruct(graph.time(graph.subGraphWithout(pred.union(desc))), listen)
               
-              context.stop(self)
+              //context.stop(self)
           }      
         }
       

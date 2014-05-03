@@ -15,7 +15,7 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
 
   //private val adjacencyList = Array.fill(numberOfVertices)(mutable.Map.empty[Int, Double] withDefaultValue Double.PositiveInfinity)
     private var adjacencyList:mutable.Map[Int, List[Int]] = build(numberOfVertices)
-    private var reverseAdjacencyList:mutable.Map[Int, List[Int]] = build(numberOfVertices)
+    private var reversedAdjacencyList:mutable.Map[Int, List[Int]] = build(numberOfVertices)
 
   //private val adjacencyList = (0 to numberOfVertices) map { i => (i, Map[Int, Double]) } toMap(mutable.Map.empty[Int, Double] withDefaultValue Double.PositiveInfinity)
   //private var adjacencyList:Map[Int, Map[Int, Double]] = (0 to numberOfVertices) map { i => (i, Map[Int, Double]()) } toMap
@@ -44,8 +44,9 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
   }
   
   
-  def withThisAdjList(adj :mutable.Map[Int, List[Int]]) = {
+  def withTheseAdjLists(adj :mutable.Map[Int, List[Int]], revAdj :mutable.Map[Int, List[Int]]) = {
     adjacencyList = adj
+    reversedAdjacencyList = revAdj
   }
 
   /**
@@ -55,7 +56,8 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    * @param points (from,to)
    * @return edge value (else 0 if from==to or +infinity if from and to has no edge)
    */
-  def apply(points: EndPoints): Boolean = if (points.u == points.v) true else adjacencyList(points.u).contains(points.v)
+  def apply(points: EndPoints): Boolean = if (points.u == points.v) true else (
+      (adjacencyList(points.u).contains(points.v)) && (reversedAdjacencyList(points.v).contains(points.u)))
 
   /**
    * curried alternative to @see apply(EndPoints)
@@ -71,7 +73,7 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    * @param points (from,to)
    * @return true iff from->to edge exists
    */
-  def has(points: EndPoints) = adjacencyList(points.u) contains points.v
+  def has(points: EndPoints) = ((adjacencyList(points.u) contains points.v) && (reversedAdjacencyList(points.v) contains points.u))
 
   /**
    * @return true iff all vertices in graph
@@ -81,7 +83,12 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
   /**
    * @return neighbors of u
    */
-  def neighbours(u: Int) = adjacencyList(u)
+  def outNeighbours(u: Int) = adjacencyList(u)
+  
+   /**
+   * @return neighbors of u
+   */
+  def inNeighbours(u: Int) = reversedAdjacencyList(u)
   
   /**
    * Update edges
@@ -100,6 +107,15 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
     if (!adjacencyList(points.u).contains((points.v))) {
       adjacencyList(points.u) = (points.v)::adjacencyList(points.u)
     }
+    if(!reversedAdjacencyList.contains(points.u)) {
+       reversedAdjacencyList += (points.u->List[Int]())
+    }
+    if(!reversedAdjacencyList.contains(points.v)) {
+       reversedAdjacencyList += (points.v->List[Int]())
+    }
+    if (!reversedAdjacencyList(points.v).contains((points.u))) {
+      reversedAdjacencyList(points.v) = (points.u)::reversedAdjacencyList(points.v)
+    }
     
     if (!isDirected) {
       adjacencyList(points.v) = (points.u)::adjacencyList(points.v)
@@ -112,6 +128,7 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    */
   def -=(points: EndPoints) {
     adjacencyList(points.u) = adjacencyList(points.u) diff List(points.v)
+    reversedAdjacencyList(points.v) = reversedAdjacencyList(points.v) diff List(points.u)
     if (!isDirected) {
       adjacencyList(points.v) = adjacencyList(points.v) diff List(points.u)
     }
@@ -125,7 +142,7 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
   /**
    * @return edges in graph
    */
-  def edges = for (u <- vertices; v <- neighbours(u)) yield u->v //TODO: TEST!
+  def edges = for (u <- vertices; v <- outNeighbours(u)) yield u->v //TODO: TEST!
 
   /*
   /**
@@ -139,7 +156,8 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
     //NOTE: this makes a new graph. Maybe better - return a view? How to do this?
     val h = new Graph(0)
     val newAdj = adjacencyList.filterKeys( group.contains ).mapValues( x => x intersect ( group ) )
-    h.withThisAdjList(mutable.Map(newAdj.toSeq: _*))
+    val newRevAdj = reversedAdjacencyList.filterKeys( group.contains ).mapValues( x => x intersect ( group ) )
+    h.withTheseAdjLists(mutable.Map(newAdj.toSeq: _*), mutable.Map(newRevAdj.toSeq: _*))
     h
   }
   
@@ -147,7 +165,8 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
     //NOTE: this makes a new graph. Maybe better - return a view? How to do this?
     val h = new Graph(0)
     val newAdj = adjacencyList.filterKeys(x => !group.contains(x) ).mapValues( x => x.diff(group) )
-    h.withThisAdjList(mutable.Map(newAdj.toSeq: _*))
+    val newRevAdj = adjacencyList.filterKeys(x => !group.contains(x) ).mapValues( x => x.diff(group) )
+    h.withTheseAdjLists(mutable.Map(newAdj.toSeq: _*), mutable.Map(newRevAdj.toSeq: _*))
     h
   }
   
@@ -159,7 +178,10 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
     subGraphOf(onlyTheseVertexes.toList)
   }
   
-  def remove(num: Int) = adjacencyList -= num
+  def remove(num: Int) = {
+    adjacencyList -= num; 
+    reversedAdjacencyList -= num; 
+  }
   
   override def toString() = {
     adjacencyList.toString()
@@ -209,7 +231,7 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
     while (!queue.isEmpty) {
       val u = queue.dequeue()
       
-      this neighbours u filterNot seen foreach visit
+      this outNeighbours u filterNot seen foreach visit
     }
 
     seen
@@ -223,6 +245,7 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    */
   def predecessors(source: Int): Set[Int] = {
     
+    /*
     var h: Graph = new Graph(0)
     val m:mutable.Map[Int,List[Int]] = mutable.Map()
     for (i <- this.vertices) {
@@ -239,6 +262,25 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
       }    
     }
     h.successors(source)
+    * 
+    */
+    
+    var (seen, queue) = (Set[Int](source), mutable.Queue.empty[Int])
+
+    def visit(i: Int) = {
+      if (source != i) seen = seen + i
+      queue += i
+    }
+
+    visit(source)
+
+    while (!queue.isEmpty) {
+      val u = queue.dequeue()
+      
+      this inNeighbours u filterNot seen foreach visit
+    }
+
+    seen
   }
 }
 
@@ -276,7 +318,7 @@ object Graph {
       inProcess += u
       count += 1
 
-      g neighbours u foreach {v =>
+      g outNeighbours u foreach {v =>
         if(!(index contains v)) {
           dfs(v)
           lowLink(u) = lowLink(u) min lowLink(v)
@@ -330,7 +372,7 @@ object Graph {
       if (f(u)) {
         return Some(u)
       }
-      g neighbours u filterNot seen foreach visit
+      g outNeighbours u filterNot seen foreach visit
     }
 
     None
@@ -347,5 +389,5 @@ object Graph {
    * @return If f is true at a vertex v, return Some(v) else None
    */
   def dfs(g: Graph, u: Int, f: Int => Boolean, seen: Set[Int] = Set.empty[Int]): Option[Int] =
-    if(f(u)) Some(u) else g neighbours u filterNot seen find {v => dfs(g, u, f, seen + u).isDefined}
+    if(f(u)) Some(u) else g outNeighbours u filterNot seen find {v => dfs(g, u, f, seen + u).isDefined}
 }

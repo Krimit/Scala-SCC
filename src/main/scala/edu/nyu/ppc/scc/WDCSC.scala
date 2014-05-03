@@ -12,12 +12,13 @@ import scala.concurrent.duration.Duration
 import scala.concurrent._
 import ExecutionContext.Implicits.global
 import akka.pattern.{ ask, pipe }
+import com.typesafe.config.ConfigFactory
 
 
  
 object WDCSC {
   
-  
+  val config = ConfigFactory.load()
   
   sealed trait SCCMessage
   case class Calculate(g: Graph) extends SCCMessage
@@ -36,6 +37,7 @@ object WDCSC {
         Future(graph.successors(v)) map Relatives pipeTo self
       
       case Relatives(group) =>
+        println("-----------DESC---------------")
          context.parent ! Descendant(group)
          context.stop(self)
     }
@@ -47,6 +49,7 @@ object WDCSC {
         Future(graph.predecessors(v)) map Relatives pipeTo self
       
       case Relatives(group) =>
+        println("-------------PRED---------------")
          context.parent ! Predecessor(group)
          context.stop(self)
     }
@@ -58,7 +61,9 @@ object WDCSC {
     
     def foreman(g: Graph, v: Int, predWorker: ActorRef, descWorker: ActorRef, listener: ActorRef): Receive = {
       case Descendant(group) =>
+        println("------------GOT DESC---------------")
         predWorker ! PoisonPill
+        descWorker ! PoisonPill
         val descGraph = g.subGraphOf(group)
         //doing work, but can't proceed until done anyway. is that best?
         val pred = descGraph.predecessors(v)
@@ -80,29 +85,46 @@ object WDCSC {
       
         
       case Predecessor(group) =>
+         println("------------GOT PRED---------------")
         descWorker ! PoisonPill
+        predWorker ! PoisonPill
         val predGraph = g.subGraphOf(group)
+         println("------------built predgraph---------------")
         //doing work, but can't proceed until done anyway. is that best?
         val desc = predGraph.successors(v)
         val scc = desc & group
         listener ! Result(scc)
+         println("------------GOT scc result, sending to listener---------------")
         
         val worker1 = context.actorOf(Props[Worker])
         val worker2 = context.actorOf(Props[Worker])
+        
+        context.watch(worker1)
+        context.watch(worker2)
              
+        println("---- subgraph1 is : " + g.subGraphOf(group--scc))
+        println("---- subgraph2 is : " + g.subGraphWithout(group))
         worker1 ! Instruct(g.subGraphOf(group--scc), listener) 
-        worker2 ! Instruct(g.subGraphWithout(group), listener)  
+        worker2 ! Instruct(g.subGraphWithout(group), listener) 
+         println("------------sent work to new workers---------------")
         context.become(start(0))
     }
     
     def start(count: Int): Receive = {
       case Instruct(graph, listen) =>
+        println("---------- Intstruction request---------------")
         if (graph.vertices.isEmpty) {
+                  println("---------- empty graph---------------")
+
           context.stop(self)
         } else if (graph.edges.isEmpty) { // output each vertex as component
+                  println("---------- no edges---------------")
+
           for (c <- graph.vertices) yield listen ! Result(Set(c))
           context.stop(self)
-        } else { //do work        
+        } else { //do work   
+                  println("---------- working---------------")
+
           val v = graph.getRandomVertex()  
           
           val descWorker = context.actorOf(Props[DescWorker]) 
@@ -115,8 +137,10 @@ object WDCSC {
         
      case Terminated(child) =>  
         if (count == 1) {
+          println("------------GOT last dead child---------------")
           context.stop(self)
         } else {
+           println("------------GOT a dead child---------------")
           context.become(start(count+1))
         }
       
@@ -144,6 +168,7 @@ object WDCSC {
     
     def receive = {
       case Result(component) =>
+        println(component)
         resultingComponents.enqueue(component)
         log.debug("Added a component {}", component.toString)
         
@@ -177,7 +202,7 @@ object WDCSC {
     master ! Calculate
     
     
-    
+    /*
     p.future onSuccess {
       case output =>
         system.shutdown
@@ -185,10 +210,13 @@ object WDCSC {
         //println(output)
         //output
     }
+    * 
+    */
     
     val output = Await.result(p.future, Duration.Inf)
     
     println("all done now outside as well")
+    system.shutdown
     output
   }
 }
