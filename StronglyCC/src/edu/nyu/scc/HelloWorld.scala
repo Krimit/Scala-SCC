@@ -1,4 +1,4 @@
-package edu.nyu.ppc.scc
+package edu.nyu.scc
 
 /**
  * Created by asher on 3/28/14.

@@ -1,4 +1,4 @@
-package edu.nyu.ppc.scc
+package edu.nyu.scc
 
 import collection.mutable
 import scala.util.Random
