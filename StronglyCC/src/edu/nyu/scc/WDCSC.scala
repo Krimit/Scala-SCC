@@ -32,24 +32,36 @@ object WDCSC {
   case class Relatives(set: Set[Int])
   
   class DescWorker() extends Actor {
+     var g: Graph = null
+    var s = 0
     def receive = {
       case Search(graph: Graph, v: Int) =>
+        g = graph
+        s = v
         Future(graph.successors(v)) map Relatives pipeTo self
       
       case Relatives(group) =>
-        println("-----------DESC---------------")
+        //println()
+        //println("DESC%%%%" + g.getAdj  + " // " + g.getRevAdj + " source: " + s + " pred: " + group)
+        //println()
          context.parent ! Descendant(group)
          context.stop(self)
     }
   }
   
   class PredWorker() extends Actor {
+    var g: Graph = null
+    var s = 0
     def receive = {
       case Search(graph: Graph, v: Int) =>
+        g = graph
+        s = v
         Future(graph.predecessors(v)) map Relatives pipeTo self
       
       case Relatives(group) =>
-        println("-------------PRED---------------")
+        //println()
+        //println("PRED%%%%" + g.getAdj + " // " + g.getRevAdj + " source: " + s + " pred: " + group)
+        //println()
          context.parent ! Predecessor(group)
          context.stop(self)
     }
@@ -59,42 +71,51 @@ object WDCSC {
     
     def receive = start(0)
     
-    def foreman(g: Graph, v: Int, predWorker: ActorRef, descWorker: ActorRef, listener: ActorRef): Receive = {
+    def foreman(g: Graph, v: Int, predWorker: ActorRef, descWorker: ActorRef, listener: ActorRef, done: Boolean): Receive = {
       case Descendant(group) =>
-        println("------------GOT DESC---------------")
-        predWorker ! PoisonPill
-        descWorker ! PoisonPill
-        val descGraph = g.subGraphOf(group)
-        //doing work, but can't proceed until done anyway. is that best?
-        val pred = descGraph.predecessors(v)
-        val scc = pred & group
-        listener ! Result(scc)
+        if (!done) {
+          predWorker ! PoisonPill
+          context.become(foreman(g, v, predWorker, descWorker, listener, true))
+          val descGraph = g.subGraphOf(group)
+          //doing work, but can't proceed until done anyway. is that best?
+          val pred = descGraph.predecessors(v)
+          //println("*** graph is: " + descGraph)
+          //println("*****group is: " + group + " pred is: " + pred)
+          //println("union with " + v + " , have new scc: " + pred.intersect(group))
+          val scc = (pred.intersect(group))
+          listener ! Result(scc)
         
-        val worker1 = context.actorOf(Props[Worker])
-        val worker2 = context.actorOf(Props[Worker])
+          val worker1 = context.actorOf(Props[Worker])
+          val worker2 = context.actorOf(Props[Worker])
         
-        context.watch(worker1)
-        context.watch(worker2)
+          context.watch(worker1)
+          context.watch(worker2)
              
-        worker1 ! Instruct(g.subGraphOf(group--scc), listener) 
-        worker2 ! Instruct(g.subGraphWithout(group), listener)  
+          val x1 = g.subGraphOf(group--scc)
+          val x2 = g.subGraphWithout(group)
+          //println("***** desc x1: " + x1)
+          //println("***** desc x2: " + x2)
+          worker1 ! Instruct((x1), listener) 
+          worker2 ! Instruct((x2), listener)  
         
-        //either watch for both to die, or kill self
-        context.stop(self)
+          context.become(start(0))
+        }
+        
         
       
         
       case Predecessor(group) =>
-         println("------------GOT PRED---------------")
-        descWorker ! PoisonPill
-        predWorker ! PoisonPill
+        if (!done) {
+           descWorker ! PoisonPill
+           context.become(foreman(g, v, predWorker, descWorker, listener, true))
         val predGraph = g.subGraphOf(group)
-         println("------------built predgraph---------------")
         //doing work, but can't proceed until done anyway. is that best?
         val desc = predGraph.successors(v)
-        val scc = desc & group
+        //println("*** graph is: " + g + " *****pred group is: " + group + " desc is: " + desc + " union with " + v + " , have new scc: " + desc.intersect(group))
+        //println()
+        //println()
+        val scc = (desc.intersect(group))
         listener ! Result(scc)
-         println("------------GOT scc result, sending to listener---------------")
         
         val worker1 = context.actorOf(Props[Worker])
         val worker2 = context.actorOf(Props[Worker])
@@ -102,28 +123,26 @@ object WDCSC {
         context.watch(worker1)
         context.watch(worker2)
              
-        println("---- subgraph1 is : " + g.subGraphOf(group--scc))
-        println("---- subgraph2 is : " + g.subGraphWithout(group))
-        worker1 ! Instruct(g.subGraphOf(group--scc), listener) 
-        worker2 ! Instruct(g.subGraphWithout(group), listener) 
-         println("------------sent work to new workers---------------")
+        val x1 = predGraph.subGraphOf(group--scc)
+        val x2 = g.subGraphWithout(group)
+        //println("*****pred x1: " + x1)
+        //println("*****pred x2: " + x2)
+        worker1 ! Instruct((x1), listener) 
+        worker2 ! Instruct((x2), listener) 
         context.become(start(0))
+        }
+       
     }
     
     def start(count: Int): Receive = {
       case Instruct(graph, listen) =>
-        println("---------- Intstruction request---------------")
         if (graph.vertices.isEmpty) {
-                  println("---------- empty graph---------------")
-
           context.stop(self)
         } else if (graph.edges.isEmpty) { // output each vertex as component
-                  println("---------- no edges---------------")
 
           for (c <- graph.vertices) yield listen ! Result(Set(c))
           context.stop(self)
         } else { //do work   
-                  println("---------- working---------------")
 
           val v = graph.getRandomVertex()  
           
@@ -132,15 +151,13 @@ object WDCSC {
           
           descWorker ! Search(graph: Graph, v: Int)
           predWorker ! Search(graph: Graph, v: Int)
-          context.become(foreman(graph, v, predWorker, descWorker, listen))
+          context.become(foreman(graph, v, predWorker, descWorker, listen, false))
         }
         
      case Terminated(child) =>  
-        if (count == 1) {
-          println("------------GOT last dead child---------------")
+        if (count >= 1) {
           context.stop(self)
         } else {
-           println("------------GOT a dead child---------------")
           context.become(start(count+1))
         }
       
@@ -158,17 +175,18 @@ object WDCSC {
       case Terminated(worker) =>
         listener ! ReportResult
         context.stop(self)
-        
-     
+   
     }
   }
  
   class Listener(val resultingComponents: mutable.Queue[Set[Int]], p: Promise[mutable.Queue[Set[Int]]]) extends Actor with ActorLogging {
    // LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     
+    var count = 0 
     def receive = {
       case Result(component) =>
-        println(component)
+        count += component.size
+        println("seen vertices scc: " + count)
         resultingComponents.enqueue(component)
         log.debug("Added a component {}", component.toString)
         
@@ -215,7 +233,7 @@ object WDCSC {
     
     val output = Await.result(p.future, Duration.Inf)
     
-    println("all done now outside as well")
+    println("all done now outside as well: " + output.size)
     system.shutdown
     output
   }

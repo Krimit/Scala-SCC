@@ -23,6 +23,7 @@ object DCSC {
   case class Calculate(g: Graph) extends SCCMessage
   case class Instruct(graph: Graph, listener: ActorRef) extends SCCMessage
   case class Result(component: Set[Int]) extends SCCMessage
+  case class SinglesResult(components: Set[Int]) extends SCCMessage
   case class ReportResult
   case class FinalResult(components: mutable.Queue[Set[Int]])
  
@@ -35,7 +36,8 @@ object DCSC {
         if (graph.vertices.isEmpty) {
           context.stop(self)
         } else if (graph.edges.isEmpty) { // output each vertex as component
-          for (c <- graph.vertices) yield listen ! Result(Set(c))
+          //for (c <- graph.vertices) yield listen ! Result(Set(c))
+          listen ! SinglesResult(graph.vertices.toSet)
           context.stop(self)
         } else { //do work        
           val v = graph.getRandomVertex()         
@@ -49,8 +51,9 @@ object DCSC {
           
           future onSuccess {
             case (pred, desc) =>
-              val scc = (pred.intersect(desc))
+              val scc = (pred.intersect(desc).union(Set(v)))
           
+              println("sending scc of size: " + scc.size)
               listen ! Result(scc)
               
               val worker1 = context.actorOf(Props[Worker])
@@ -60,9 +63,14 @@ object DCSC {
               context.watch(worker2)
               context.watch(worker3)
 
-              worker1 ! Instruct(graph.time(graph.subGraphOf(pred--scc)), listen)  
-              worker2 ! Instruct(graph.time(graph.subGraphOf(desc--scc)), listen)          
-              worker3 ! Instruct(graph.time(graph.subGraphWithout(pred.union(desc))), listen)
+              //println("pred minus scc")
+              worker1 ! Instruct(graph.time(graph.subGraphOf(pred.union(Set(v))--scc)), listen) 
+              //println("desc minus scc")
+              worker2 ! Instruct(graph.time(graph.subGraphOf(desc.union(Set(v))--scc)), listen)  
+              //println("rem")
+              worker3 ! Instruct(graph.time(graph.subGraphOf(graph.vertices.toSet--(pred.union(desc).union(Set(v))))), listen)
+              //worker3 ! Instruct(graph.time(graph.subGraphWithout(pred.union(desc).union(Set(v)))), listen)
+            
               
               //context.stop(self)
           }      
@@ -96,10 +104,23 @@ object DCSC {
   class Listener(val resultingComponents: mutable.Queue[Set[Int]], p: Promise[mutable.Queue[Set[Int]]]) extends Actor with ActorLogging {
    // LoggingAdapter log = Logging.getLogger(getContext().system(), this);
     
+    var count = 0
+    
     def receive = {
       case Result(component) =>
+        count += component.size
+        println("seen vertices scc: " + count)
         resultingComponents.enqueue(component)
         log.debug("Added a component {}", component.toString)
+      
+      case SinglesResult(components) =>
+        count += components.size
+        println("singles added: " + count)
+        for (v <- components) {
+          resultingComponents.enqueue(Set(v))
+        }
+        
+        log.debug("Added a component {}", components.toString)
         
       case ReportResult =>
         sender ! FinalResult(resultingComponents)
@@ -142,7 +163,7 @@ object DCSC {
     
     val output = Await.result(p.future, Duration.Inf)
     
-    //println("all done now outside as well")
+    println("all done now outside as well: " + output.size)
     output
   }
 }

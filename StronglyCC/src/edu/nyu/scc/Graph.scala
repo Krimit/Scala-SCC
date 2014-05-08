@@ -20,6 +20,7 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
   //private val adjacencyList = (0 to numberOfVertices) map { i => (i, Map[Int, Double]) } toMap(mutable.Map.empty[Int, Double] withDefaultValue Double.PositiveInfinity)
   //private var adjacencyList:Map[Int, Map[Int, Double]] = (0 to numberOfVertices) map { i => (i, Map[Int, Double]()) } toMap
   
+    
   
   private implicit class Edge(points: EndPoints) {
     val (u, v) = points
@@ -43,6 +44,13 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
     m
   }
   
+  def getAdj() = {
+    adjacencyList
+  }
+  
+  def getRevAdj() = {
+    reversedAdjacencyList
+  }
   
   def withTheseAdjLists(adj :mutable.Map[Int, List[Int]], revAdj :mutable.Map[Int, List[Int]]) = {
     adjacencyList = adj
@@ -165,7 +173,7 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
     //NOTE: this makes a new graph. Maybe better - return a view? How to do this?
     val h = new Graph(0)
     val newAdj = adjacencyList.filterKeys(x => !group.contains(x) ).mapValues( x => x.diff(group) )
-    val newRevAdj = adjacencyList.filterKeys(x => !group.contains(x) ).mapValues( x => x.diff(group) )
+    val newRevAdj = reversedAdjacencyList.filterKeys(x => !group.contains(x) ).mapValues( x => x.diff(group) )
     h.withTheseAdjLists(mutable.Map(newAdj.toSeq: _*), mutable.Map(newRevAdj.toSeq: _*))
     h
   }
@@ -344,6 +352,17 @@ object Graph {
       u <- g.vertices
       if (!(index contains u))
     } dfs(u)
+    println("all done now outside as well: " + sccs.size)
+    //how many singles are there?
+    var i = 0
+    
+    for (c <- sccs) {
+      if (c.size == 1) {
+        i += 1
+      } 
+    }
+    println(i + " components of size 1")
+    
     sccs.toSeq
   }
 

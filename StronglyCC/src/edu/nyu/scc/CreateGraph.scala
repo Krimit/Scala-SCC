@@ -41,18 +41,22 @@ object CreateGraph {
         }
       }
     }
-      
+    var c = 0;  
     for (u <- graph.vertices) {
+      println("count: " + c)
       for (v <- graph.outNeighbours(u)) {
         if (u < v && (rand.nextDouble() <= p)) {
           graph-=(u -> v)
           var r = -1
           do {
-            r = rand.nextInt((graph.vertices.size+1))                  
-          } while (r != u &&  !graph.edges.contains(u->v))
+            r = rand.nextInt((graph.vertices.size+1)) 
+           // println(r + " " + u)
+          } while (r != u &&  !graph.edges.contains(u->r))
           graph.update((u->r))
+         // println("updated")
         }
-      }    
+      } 
+      c+=1;
     }
     return graph
   }
