@@ -50,10 +50,8 @@ object CreateGraph {
           var r = -1
           do {
             r = rand.nextInt((graph.vertices.size+1)) 
-           // println(r + " " + u)
           } while (r != u &&  !graph.edges.contains(u->r))
           graph.update((u->r))
-         // println("updated")
         }
       } 
       c+=1;

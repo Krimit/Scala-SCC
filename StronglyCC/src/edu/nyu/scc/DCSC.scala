@@ -36,7 +36,6 @@ object DCSC {
         if (graph.vertices.isEmpty) {
           context.stop(self)
         } else if (graph.edges.isEmpty) { // output each vertex as component
-          //for (c <- graph.vertices) yield listen ! Result(Set(c))
           listen ! SinglesResult(graph.vertices.toSet)
           context.stop(self)
         } else { //do work        
@@ -63,16 +62,9 @@ object DCSC {
               context.watch(worker2)
               context.watch(worker3)
 
-              //println("pred minus scc")
               worker1 ! Instruct(graph.time(graph.subGraphOf(pred.union(Set(v))--scc)), listen) 
-              //println("desc minus scc")
               worker2 ! Instruct(graph.time(graph.subGraphOf(desc.union(Set(v))--scc)), listen)  
-              //println("rem")
               worker3 ! Instruct(graph.time(graph.subGraphOf(graph.vertices.toSet--(pred.union(desc).union(Set(v))))), listen)
-              //worker3 ! Instruct(graph.time(graph.subGraphWithout(pred.union(desc).union(Set(v)))), listen)
-            
-              
-              //context.stop(self)
           }      
         }
       
@@ -86,7 +78,7 @@ object DCSC {
   }
 
   class Master(graph: Graph, listener: ActorRef) extends Actor {
-    
+    context.setReceiveTimeout(10 minutes)
     val worker: ActorRef = context.actorOf(Props[Worker], "worker1")
     context.watch(worker)
     
@@ -97,12 +89,16 @@ object DCSC {
         listener ! ReportResult
         context.stop(self)
         
+      case ReceiveTimeout =>
+        listener ! ReportResult
+        context.stop(self)
+        
      
     }
   }
  
-  class Listener(val resultingComponents: mutable.Queue[Set[Int]], p: Promise[mutable.Queue[Set[Int]]]) extends Actor with ActorLogging {
-   // LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+  class Listener(val resultingComponents: mutable.Queue[Set[Int]], 
+      p: Promise[mutable.Queue[Set[Int]]]) extends Actor with ActorLogging {
     
     var count = 0
     
@@ -141,8 +137,7 @@ object DCSC {
     val p = Promise[mutable.Queue[Set[Int]]]
     val components = mutable.Queue.empty[Set[Int]]
     val listener = system.actorOf(props(components, p), name = "listener")
- 
- 
+  
     // create the master
     val master = system.actorOf(Props(new Master(
       graph, listener)),
@@ -150,9 +145,7 @@ object DCSC {
  
     // start the calculation
     master ! Calculate
-    
-    
-    
+   
     p.future onSuccess {
       case output =>
         system.shutdown
@@ -163,7 +156,6 @@ object DCSC {
     
     val output = Await.result(p.future, Duration.Inf)
     
-    println("all done now outside as well: " + output.size)
     output
   }
 }

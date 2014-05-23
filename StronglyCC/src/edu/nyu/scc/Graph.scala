@@ -9,19 +9,16 @@ import scala.util.Random
  *
  * @param numberOfVertices Number of vertices in graph
  * @param isDirected true iff a directed graph
+ * 
+ * Based on code from: https://github.com/pathikrit/scalgos
+ * 
  */
 class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
   import Graph.EndPoints
 
-  //private val adjacencyList = Array.fill(numberOfVertices)(mutable.Map.empty[Int, Double] withDefaultValue Double.PositiveInfinity)
-    private var adjacencyList:mutable.Map[Int, List[Int]] = build(numberOfVertices)
-    private var reversedAdjacencyList:mutable.Map[Int, List[Int]] = build(numberOfVertices)
+  private var adjacencyList:mutable.Map[Int, List[Int]] = build(numberOfVertices)
+  private var reversedAdjacencyList:mutable.Map[Int, List[Int]] = build(numberOfVertices)
 
-  //private val adjacencyList = (0 to numberOfVertices) map { i => (i, Map[Int, Double]) } toMap(mutable.Map.empty[Int, Double] withDefaultValue Double.PositiveInfinity)
-  //private var adjacencyList:Map[Int, Map[Int, Double]] = (0 to numberOfVertices) map { i => (i, Map[Int, Double]()) } toMap
-  
-    
-  
   private implicit class Edge(points: EndPoints) {
     val (u, v) = points
     assume(hasVertices(u, v))
@@ -152,16 +149,10 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    */
   def edges = for (u <- vertices; v <- outNeighbours(u)) yield u->v //TODO: TEST!
 
-  /*
-  /**
-   * @return the adjacency matrix of this graph
-   */
-  def adjacencyMatrix = Array.tabulate(numberOfVertices, numberOfVertices)((u, v) => this(u->v))
-  */
   def isEmpty = edges.isEmpty
   
   def subGraphOf(group: List[Int]) = {
-    //NOTE: this makes a new graph. Maybe better - return a view? How to do this?
+    //NOTE: this makes a new graph. Maybe better - return a view?
     val h = new Graph(0)
     val newAdj = adjacencyList.filterKeys( group.contains ).mapValues( x => x intersect ( group ) )
     val newRevAdj = reversedAdjacencyList.filterKeys( group.contains ).mapValues( x => x intersect ( group ) )
@@ -170,7 +161,6 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
   }
   
   def subGraphWithout(group: List[Int]) = {
-    //NOTE: this makes a new graph. Maybe better - return a view? How to do this?
     val h = new Graph(0)
     val newAdj = adjacencyList.filterKeys(x => !group.contains(x) ).mapValues( x => x.diff(group) )
     val newRevAdj = reversedAdjacencyList.filterKeys(x => !group.contains(x) ).mapValues( x => x.diff(group) )
@@ -253,26 +243,6 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
    */
   def predecessors(source: Int): Set[Int] = {
     
-    /*
-    var h: Graph = new Graph(0)
-    val m:mutable.Map[Int,List[Int]] = mutable.Map()
-    for (i <- this.vertices) {
-      m += (i->List[Int]())
-    }
-    h.withThisAdjList(m)
-
-    
-    for (u <- this.vertices) {
-      for (v <- this.vertices) {
-        if ((u != v) && (this.has((u,v)))) {
-            h.update((v,u))   
-        }
-      }    
-    }
-    h.successors(source)
-    * 
-    */
-    
     var (seen, queue) = (Set[Int](source), mutable.Queue.empty[Int])
 
     def visit(i: Int) = {
@@ -292,9 +262,7 @@ class Graph(val numberOfVertices: Int, val isDirected: Boolean = true) {
   }
 }
 
-/**
- * Collection of graph algorithms
- */
+
 object Graph {
 
   private type EndPoints = Pair[Int, Int]
